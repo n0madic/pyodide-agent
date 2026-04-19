@@ -1,0 +1,23 @@
+{
+  "unstable": ["worker-options"],
+  "tasks": {
+    "start": "deno run --env-file=.env --allow-env=OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY --allow-read --allow-write --allow-net=api.openai.com,cdn.jsdelivr.net --allow-import=cdn.jsdelivr.net,jsr.io src/main.ts",
+    "start:docker": "deno run --allow-env=OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY --allow-read --allow-write --allow-net=api.openai.com,cdn.jsdelivr.net --allow-import=cdn.jsdelivr.net,jsr.io /home/agent/app/src/main.ts",
+    "start:net": "deno run --env-file=.env --allow-env=OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY --allow-read --allow-write --allow-net --allow-import src/main.ts --allow-net",
+    "start:unsafe": "deno run --env-file=.env --allow-all src/main.ts --allow-net --allow-host-exec",
+    "check": "deno check src/main.ts",
+    "compile": "deno compile --allow-env=OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY --allow-read --allow-write --allow-net --allow-import --output pyodide-agent src/main.ts"
+  },
+  "imports": {
+    "commander": "npm:commander@^13.0.0",
+    "openai": "npm:openai@^6.1.0",
+    "pyodide": "npm:pyodide@^0.29.3",
+    "pyodide/": "npm:/pyodide@^0.29.3/",
+    "@std/path": "jsr:@std/path@^1.0.0"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["deno.window"]
+  },
+  "lock": true
+}

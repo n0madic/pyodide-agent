@@ -1,0 +1,9 @@
+.git
+.env
+*.log
+.DS_Store
+pyodide-agent
+README.md
+Dockerfile
+.dockerignore
+.gitignore
