@@ -79,7 +79,7 @@ export async function* runAgent(
 
     yield {
       kind: "api_call",
-      iteration: i,
+      iteration: iterations,
       inputTokens: resp.usage?.prompt_tokens ?? 0,
       outputTokens: resp.usage?.completion_tokens ?? 0,
       durationMs,
