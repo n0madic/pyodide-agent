@@ -115,8 +115,9 @@ async function readStdin(): Promise<string> {
   const dec = new TextDecoder();
   let buf = "";
   for await (const chunk of Deno.stdin.readable) {
-    buf += dec.decode(chunk);
+    buf += dec.decode(chunk, { stream: true });
   }
+  buf += dec.decode(); // flush any incomplete multi-byte sequence
   return buf;
 }
 
