@@ -9,6 +9,7 @@ ENV DENO_DIR=/deno-cache
 
 COPY deno.json deno.lock* ./
 COPY src ./src
+COPY scripts ./scripts
 
 # Populate DENO_DIR with npm:openai, npm:commander, npm:pyodide, @std/path.
 RUN deno cache src/main.ts
@@ -37,6 +38,7 @@ RUN addgroup -S agent && adduser -S -G agent -h /home/agent agent \
 COPY --from=builder --chown=agent:agent /deno-cache "$DENO_DIR"
 COPY --from=builder --chown=agent:agent /build/deno.json /build/deno.lock* /home/agent/app/
 COPY --from=builder --chown=agent:agent /build/src /home/agent/app/src
+COPY --from=builder --chown=agent:agent /build/scripts /home/agent/app/scripts
 
 USER agent
 WORKDIR /work

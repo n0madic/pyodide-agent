@@ -1,10 +1,10 @@
 {
   "unstable": ["worker-options"],
   "tasks": {
-    "start": "deno run --env-file=.env --allow-env=OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY --allow-read --allow-write --allow-net=api.openai.com,cdn.jsdelivr.net --allow-import=cdn.jsdelivr.net,jsr.io src/main.ts",
-    "start:docker": "deno run --allow-env=OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY --allow-read --allow-write --allow-net=api.openai.com,cdn.jsdelivr.net --allow-import=cdn.jsdelivr.net,jsr.io /home/agent/app/src/main.ts",
-    "start:net": "deno run --env-file=.env --allow-env=OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY --allow-read --allow-write --allow-net --allow-import src/main.ts --allow-net",
-    "start:unsafe": "deno run --env-file=.env --allow-all src/main.ts --allow-net --allow-host-exec",
+    "start": "sh scripts/start.sh",
+    "start:docker": "sh /home/agent/app/scripts/start-docker.sh",
+    "start:net": "sh scripts/start.sh --net",
+    "start:unsafe": "sh scripts/start.sh --unsafe",
     "check": "deno check src/main.ts",
     "compile": "deno compile --allow-env=OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY --allow-read --allow-write --allow-net --allow-import --output pyodide-agent src/main.ts"
   },
