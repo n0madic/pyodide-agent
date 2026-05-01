@@ -2,7 +2,7 @@
   "unstable": ["worker-options"],
   "tasks": {
     "start": "sh scripts/start.sh",
-    "start:docker": "sh /home/agent/app/scripts/start-docker.sh",
+    "start:docker": "sh /home/agent/app/scripts/start.sh",
     "start:net": "sh scripts/start.sh --net",
     "start:unsafe": "sh scripts/start.sh --unsafe",
     "check": "deno check src/main.ts",

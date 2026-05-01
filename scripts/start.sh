@@ -1,37 +1,51 @@
 #!/usr/bin/env sh
-# Unified launcher for all local deno task start* variants.
-# Usage: start.sh [--net|--unsafe] [-- app args...]
+# Unified launcher for all deno task start* variants (local + Docker).
+# Usage: start.sh [--net|--unsafe] [app args...]
 #
-# --net    broad --allow-net, loads ssl+pyodide-http (like start:net)
-# --unsafe --allow-all + Python host-exec unblocked (like start:unsafe)
-# (none)   scoped --allow-net, host auto-added from OPENAI_BASE_URL
+# --net    broad --allow-net, loads ssl+pyodide-http
+# --unsafe --allow-all + Python host-exec unblocked
+# (none)   scoped --allow-net, OPENAI_BASE_URL host auto-added
+#
+# Paths are resolved relative to this script so it works both locally
+# (scripts/start.sh → src/main.ts) and in Docker (/home/agent/app/scripts/ →
+# /home/agent/app/src/main.ts). --env-file is added only when .env exists.
 set -e
 
-ALLOW_ENV="OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+PROJECT_DIR=$(cd "${SCRIPT_DIR}/.." && pwd)
+MAIN_TS="${PROJECT_DIR}/src/main.ts"
+ENV_FILE="${PROJECT_DIR}/.env"
+
 MODE="default"
 case "${1:-}" in
   --net)    MODE="net";    shift ;;
   --unsafe) MODE="unsafe"; shift ;;
 esac
 
+# --env-file flag — omitted in Docker where .env is not in the image
+ENV_FLAG=""
+[ -f "$ENV_FILE" ] && ENV_FLAG="--env-file=${ENV_FILE}"
+
 case "$MODE" in
   net)
+    # shellcheck disable=SC2086
     exec deno run \
-      --env-file=.env \
-      "--allow-env=${ALLOW_ENV}" \
+      $ENV_FLAG \
+      --allow-env="*" \
       --allow-read --allow-write --allow-net --allow-import \
-      src/main.ts --allow-net "$@"
+      "$MAIN_TS" --allow-net "$@"
     ;;
   unsafe)
+    # shellcheck disable=SC2086
     exec deno run \
-      --env-file=.env \
+      $ENV_FLAG \
       --allow-all \
-      src/main.ts --allow-net --allow-host-exec "$@"
+      "$MAIN_TS" --allow-net --allow-host-exec "$@"
     ;;
   *)
     BASE_URL="${OPENAI_BASE_URL:-}"
-    if [ -z "$BASE_URL" ] && [ -f .env ]; then
-      BASE_URL=$(grep -E '^OPENAI_BASE_URL=' .env 2>/dev/null | head -1 | cut -d= -f2-)
+    if [ -z "$BASE_URL" ] && [ -f "$ENV_FILE" ]; then
+      BASE_URL=$(grep -E '^OPENAI_BASE_URL=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-)
       BASE_URL=$(echo "$BASE_URL" | sed "s/^['\"]//; s/['\"]$//")
     fi
     ALLOW_NET="api.openai.com,cdn.jsdelivr.net"
@@ -44,12 +58,13 @@ case "$MODE" in
         esac
       fi
     fi
+    # shellcheck disable=SC2086
     exec deno run \
-      --env-file=.env \
-      "--allow-env=${ALLOW_ENV}" \
+      $ENV_FLAG \
+      --allow-env="*" \
       --allow-read --allow-write \
       "--allow-net=${ALLOW_NET}" \
       --allow-import=cdn.jsdelivr.net,jsr.io \
-      src/main.ts "$@"
+      "$MAIN_TS" "$@"
     ;;
 esac
