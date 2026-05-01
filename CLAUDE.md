@@ -18,6 +18,7 @@ deno task start                                  # interactive REPL
 deno task start "prompt"                         # one-shot, answer on stdout
 deno task start --verbose "..."                  # also stream tool calls to stderr
 deno task start --json "..."                     # emit JSON payload to stdout
+deno task start --raw "..."                      # print reply as raw text (no Markdown rendering)
 deno task start --mount-dir ~/notes "..."        # expose host dir at /host (read-write)
 
 deno task start --allow-net ...                  # (see start:net)

@@ -13,7 +13,9 @@
     "openai": "npm:openai@^6.1.0",
     "pyodide": "npm:pyodide@^0.29.3",
     "pyodide/": "npm:/pyodide@^0.29.3/",
-    "@std/path": "jsr:@std/path@^1.0.0"
+    "@std/path": "jsr:@std/path@^1.0.0",
+    "marked": "npm:marked@^14.0.0",
+    "marked-terminal": "npm:marked-terminal@^7.0.0"
   },
   "compilerOptions": {
     "strict": true,

@@ -30,6 +30,7 @@ deno task start                             # interactive REPL
 deno task start "what is 17 * 23?"          # one-shot, answer on stdout
 deno task start --verbose "summarize: …"    # also stream tool calls to stderr
 deno task start --json "pi to 8 digits"     # JSON payload to stdout
+deno task start --raw "…"                   # print reply as raw text (no Markdown rendering)
 echo "list primes under 30" | deno task start -
 
 deno task start --mount-dir ~/notes \

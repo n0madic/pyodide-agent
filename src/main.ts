@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import * as readline from "node:readline/promises";
 import process from "node:process";
 import { type AgentEvent, type AgentRunResult, runAgent } from "./agent.ts";
-import { renderEvent } from "./cli-format.ts";
+import { renderEvent, renderMarkdown } from "./cli-format.ts";
 import { buildSystemPrompt } from "./system-prompt.ts";
 import {
   closePyodide,
@@ -23,6 +23,7 @@ interface Opts {
   packages?: string;
   allowHostExec?: boolean;
   allowNet?: boolean;
+  raw?: boolean;
 }
 
 const enc = new TextEncoder();
@@ -74,6 +75,11 @@ const program = new Command()
       "the default Deno posture grants net only to api.openai.com + cdn.jsdelivr.net, so " +
       "Python can't reach arbitrary hosts even if it tried.",
     false,
+  )
+  .option(
+    "--raw",
+    "print the model's reply as raw text without terminal Markdown rendering",
+    false,
   );
 
 program.parse();
@@ -121,8 +127,10 @@ async function readStdin(): Promise<string> {
   return buf;
 }
 
+const useMarkdown = opts.raw !== true;
+
 function printEvent(event: AgentEvent, sink: Sink): void {
-  const rendered = renderEvent(event);
+  const rendered = renderEvent(event, { markdown: useMarkdown });
   if (rendered) {
     sink(rendered);
   }
@@ -287,7 +295,13 @@ async function runOneShot(rawPrompt: string): Promise<void> {
       };
       stdoutWrite(JSON.stringify(payload, null, 2) + "\n");
     } else {
-      stdoutWrite((result.finalText || "").trimEnd() + "\n");
+      const text = (result.finalText || "").trimEnd();
+      // Render markdown only for interactive terminals (and only if --raw
+      // wasn't passed); piped/redirected stdout gets raw markdown so
+      // downstream tools (grep, files, etc.) see the original.
+      const shouldRender = useMarkdown && Deno.stdout.isTerminal();
+      const out = shouldRender ? renderMarkdown(text).trimEnd() : text;
+      stdoutWrite(out + "\n");
     }
 
     if (result.hitMaxIterations) {
