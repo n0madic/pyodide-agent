@@ -29,8 +29,10 @@ deno task check                                  # deno check src/main.ts (stric
 deno task compile                                # build standalone ./pyodide-agent (~100 MB)
 ```
 
-No test suite or linter is configured. Run `deno task check` after non-trivial
-edits — it's the only correctness gate.
+No linter is configured. Tests live in `tests/` (`security.test.ts` covers the
+sandbox boundary, `tool-defs.test.ts` covers the dynamic `execute_code`
+description). Run `deno task check` for type-checking and `deno test tests/`
+for the test suite after non-trivial edits.
 
 Requires `OPENAI_API_KEY` in `.env`; Deno loads it automatically via
 `--env-file=.env` on every task. See `.env.example` for all knobs (`MODEL`,

@@ -1,5 +1,4 @@
 import type OpenAI from "openai";
-import { TOOLS } from "./tool-defs.ts";
 import { executeCode } from "./pyodide-runtime.ts";
 
 // Some OpenAI-compatible endpoints (and certain model versions) occasionally
@@ -41,6 +40,7 @@ export interface RunAgentOpts {
   systemPrompt: string;
   userMessage: string;
   history: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+  tools: OpenAI.Chat.Completions.ChatCompletionTool[];
   maxIterations?: number;
 }
 
@@ -53,6 +53,7 @@ export async function* runAgent(
     systemPrompt,
     userMessage,
     history,
+    tools,
     maxIterations = 20,
   } = opts;
 
@@ -72,7 +73,7 @@ export async function* runAgent(
     const resp = await client.chat.completions.create({
       model,
       messages,
-      tools: TOOLS,
+      tools,
       tool_choice: "auto",
     });
     const durationMs = Date.now() - started;

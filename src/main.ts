@@ -6,6 +6,7 @@ import process from "node:process";
 import { type AgentEvent, type AgentRunResult, runAgent } from "./agent.ts";
 import { renderEvent, renderMarkdown } from "./cli-format.ts";
 import { buildSystemPrompt } from "./system-prompt.ts";
+import { buildTools } from "./tool-defs.ts";
 import {
   closePyodide,
   DEFAULT_PACKAGE_SPEC,
@@ -113,6 +114,11 @@ const packages = resolvePackages(
 const systemPrompt = buildSystemPrompt({
   mountDir: opts.mountDir,
   packages,
+  allowHostExec,
+  allowNet,
+});
+const tools = buildTools({
+  mountDir: opts.mountDir,
   allowHostExec,
   allowNet,
 });
@@ -227,6 +233,7 @@ async function runInteractive(): Promise<void> {
         systemPrompt,
         userMessage: line,
         history,
+        tools,
         maxIterations,
       });
       let next = await gen.next();
@@ -267,6 +274,7 @@ async function runOneShot(rawPrompt: string): Promise<void> {
       systemPrompt,
       userMessage: rawPrompt,
       history: [],
+      tools,
       maxIterations,
     });
     let next = await gen.next();
