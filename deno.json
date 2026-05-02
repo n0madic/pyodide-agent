@@ -6,7 +6,7 @@
     "start:net": "sh scripts/start.sh --net",
     "start:unsafe": "sh scripts/start.sh --unsafe",
     "check": "deno check src/main.ts",
-    "compile": "deno compile --allow-env=OPENAI_*,MODEL,MAX_ITERATIONS,PYODIDE_PACKAGES,HTTP_PROXY,HTTPS_PROXY,NO_PROXY --allow-read --allow-write --allow-net --allow-import --output pyodide-agent src/main.ts"
+    "compile": "deno compile --allow-env=* --allow-read --allow-write --allow-net --allow-import --include src/pyodide-worker.ts --output pyodide-agent src/main.ts"
   },
   "imports": {
     "commander": "npm:commander@^13.0.0",

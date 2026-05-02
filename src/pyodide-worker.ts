@@ -1,6 +1,9 @@
+/// <reference no-default-lib="true" />
+/// <reference lib="deno.worker" />
+
 import { resolve } from "@std/path";
 import pyodideModule from "pyodide/pyodide.js";
-import type { PyodideInterface, LoadPyodideConfig } from "pyodide";
+import type { PyodideInterface, PyodideConfig } from "pyodide";
 import type {
   ExecuteResult,
   WorkerInitPayload,
@@ -9,7 +12,7 @@ import type {
 } from "./pyodide-worker-protocol.ts";
 
 const { loadPyodide } = pyodideModule as {
-  loadPyodide: (opts?: LoadPyodideConfig) => Promise<PyodideInterface>;
+  loadPyodide: (opts?: PyodideConfig) => Promise<PyodideInterface>;
 };
 
 // Python gets a curated JS bridge. This intentionally omits `Deno`, `process`,
