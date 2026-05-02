@@ -26,13 +26,16 @@ deno task start:net ...                          # broad --allow-net + loads ssl
 deno task start:unsafe ...                       # --allow-all + --allow-host-exec + --allow-net
 
 deno task check                                  # deno check src/main.ts (strict TS)
+deno task test                                   # run tests/ with required perms
 deno task compile                                # build standalone ./pyodide-agent (~100 MB)
 ```
 
 No linter is configured. Tests live in `tests/` (`security.test.ts` covers the
 sandbox boundary, `tool-defs.test.ts` covers the dynamic `execute_code`
-description). Run `deno task check` for type-checking and `deno test tests/`
-for the test suite after non-trivial edits.
+description). Run `deno task check` for type-checking and `deno task test`
+for the test suite after non-trivial edits (the task wires up the read/write/run/env/net
+permissions the security tests need — bare `deno test` fails with
+`Can't escalate parent thread permissions`).
 
 Requires `OPENAI_API_KEY` in `.env`; Deno loads it automatically via
 `--env-file=.env` on every task. See `.env.example` for all knobs (`MODEL`,

@@ -6,6 +6,7 @@
     "start:net": "sh scripts/start.sh --net",
     "start:unsafe": "sh scripts/start.sh --unsafe",
     "check": "deno check src/main.ts",
+    "test": "deno test --allow-read --allow-write --allow-run --allow-env --allow-net=cdn.jsdelivr.net tests/",
     "compile": "deno compile --allow-env=* --allow-read --allow-write --allow-net --allow-import --include src/pyodide-worker.ts --output pyodide-agent src/main.ts"
   },
   "imports": {
