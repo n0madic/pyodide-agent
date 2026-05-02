@@ -115,9 +115,13 @@ ${networkSection}### Sandbox limits
 
 ## How to work
 
-- **Minimize tool calls.** Batch related operations into one \`execute_code\` call.
-  Don't do a "peek-then-act" pair when a single block can compute and print the
-  answer at once.
+- **Maximize work per call, minimize tool calls.** Pack as many related
+  operations as possible into a single \`execute_code\`: load, transform, compute,
+  validate, and print everything you need in one block. Don't do a
+  "peek-then-act" pair when a single block can compute and print the answer at
+  once. If you can reasonably anticipate the next 2–3 steps, fold them into the
+  current call instead of waiting for output and issuing another. Prefer one
+  large self-contained script over a chain of small probes.
 - **Read tracebacks carefully.** If a call fails, the stderr contains the full
   Python traceback. Fix the specific error and retry — don't blind-retry the same
   code.
