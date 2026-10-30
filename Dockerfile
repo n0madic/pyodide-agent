@@ -19,7 +19,7 @@ RUN deno cache src/main.ts
 # so no --allow-* flags are accepted here. We call Pyodide directly (not the
 # agent) to avoid needing an OPENAI_API_KEY at build time.
 RUN deno eval \
-    'import m from "npm:pyodide@^0.29.3/pyodide.js"; \
+    'import m from "npm:pyodide@^314.0.7/pyodide.js"; \
      const { loadPyodide } = m; \
      const py = await loadPyodide(); \
      await py.loadPackage(["micropip","ssl","pyodide-http","pyyaml","python-dateutil", \

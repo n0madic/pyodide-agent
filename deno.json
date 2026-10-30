@@ -10,13 +10,13 @@
     "compile": "deno compile --allow-env=* --allow-read --allow-write --allow-net --allow-import --include src/pyodide-worker.ts --output pyodide-agent src/main.ts"
   },
   "imports": {
-    "commander": "npm:commander@^13.0.0",
-    "openai": "npm:openai@^6.1.0",
-    "pyodide": "npm:pyodide@^0.29.3",
-    "pyodide/": "npm:/pyodide@^0.29.3/",
-    "@std/path": "jsr:@std/path@^1.0.0",
-    "marked": "npm:marked@^14.0.0",
-    "marked-terminal": "npm:marked-terminal@^7.0.0"
+    "commander": "npm:commander@^15.0.0",
+    "openai": "npm:openai@^7.45.1",
+    "pyodide": "npm:pyodide@^314.0.7",
+    "pyodide/": "npm:/pyodide@^314.0.7/",
+    "@std/path": "jsr:@std/path@^1.1.6",
+    "marked": "npm:marked@^18.1.2",
+    "marked-terminal": "npm:marked-terminal@^7.3.1"
   },
   "compilerOptions": {
     "strict": true,
