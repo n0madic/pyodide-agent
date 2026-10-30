@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert";
-import { buildTools } from "../src/tool-defs.ts";
+import { buildTools, MAX_TOOL_OUTPUT_CHARS } from "../src/tool-defs.ts";
 
 function getDescription(opts: Parameters<typeof buildTools>[0]): string {
   const tools = buildTools(opts);
@@ -80,5 +80,13 @@ Deno.test("execute_code description does not leak CLI flag names", () => {
       !desc.includes("--mount-dir"),
       `should not mention --mount-dir: ${desc}`,
     );
+  }
+});
+
+Deno.test("execute_code description asks for one complete script and states the output cap", () => {
+  for (const opts of [{}, { allowNet: true, allowHostExec: true, mountDir: "/x" }]) {
+    const desc = getDescription(opts);
+    assertStringIncludes(desc, "ONE complete script");
+    assertStringIncludes(desc, `${MAX_TOOL_OUTPUT_CHARS} characters`);
   }
 });

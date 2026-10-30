@@ -1,5 +1,25 @@
 import type OpenAI from "openai";
 import { executeCode } from "./pyodide-runtime.ts";
+import { MAX_TOOL_OUTPUT_CHARS } from "./tool-defs.ts";
+
+/**
+ * Keep the head and tail of an over-long tool output and replace the middle
+ * with a marker, so the model keeps both the start and the (usually most
+ * informative) end such as a traceback. Cuts never split a surrogate pair.
+ * The result is `max` characters of the original plus the marker.
+ */
+export function truncateMiddle(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const headLen = Math.ceil(max / 2);
+  const tailLen = max - headLen;
+  let head = text.slice(0, headLen);
+  let tail = tailLen > 0 ? text.slice(text.length - tailLen) : "";
+  if (/[\uD800-\uDBFF]$/.test(head)) head = head.slice(0, -1);
+  if (/^[\uDC00-\uDFFF]/.test(tail)) tail = tail.slice(1);
+  const omitted = text.length - head.length - tail.length;
+  return `${head}\n… [${omitted} characters truncated from the middle; ` +
+    `filter or aggregate in code and keep raw data in variables] …\n${tail}`;
+}
 
 // Some OpenAI-compatible endpoints (and certain model versions) occasionally
 // return the same text twice in a single message content, separated by one or
@@ -154,7 +174,7 @@ export async function* runAgent(
       messages.push({
         role: "tool",
         tool_call_id: tc.id,
-        content,
+        content: truncateMiddle(content, MAX_TOOL_OUTPUT_CHARS),
       });
     }
   }

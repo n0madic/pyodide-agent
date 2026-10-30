@@ -22,7 +22,7 @@ deno task start --raw "..."                      # print reply as raw text (no M
 deno task start --mount-dir ~/notes "..."        # expose host dir at /host (read-write)
 
 deno task start --allow-net ...                  # (see start:net)
-deno task start:net ...                          # broad --allow-net + loads ssl+pyodide-http
+deno task start:net ...                          # broad --allow-net + loads pyodide-http
 deno task start:unsafe ...                       # --allow-all + --allow-host-exec + --allow-net
 
 deno task check                                  # deno check src/main.ts (strict TS)
@@ -32,7 +32,10 @@ deno task compile                                # build standalone ./pyodide-ag
 
 No linter is configured. Tests live in `tests/` (`security.test.ts` covers the
 sandbox boundary, `tool-defs.test.ts` covers the dynamic `execute_code`
-description). Run `deno task check` for type-checking and `deno task test`
+description, `helpers.test.ts` runs the Python helpers in a real Pyodide,
+`system-prompt.test.ts` checks the prompt/helper matrix across modes,
+`agent.test.ts` covers output truncation; `_pyodide.ts` is the shared
+subprocess runner). Run `deno task check` for type-checking and `deno task test`
 for the test suite after non-trivial edits (the task wires up the read/write/run/env/net
 permissions the security tests need — bare `deno test` fails with
 `Can't escalate parent thread permissions`).
@@ -43,7 +46,7 @@ Requires `OPENAI_API_KEY` in `.env`; Deno loads it automatically via
 
 ## Architecture
 
-Five source files, each with a narrow responsibility. Understand these four
+Each source file has a narrow responsibility. Understand these five
 relationships before editing:
 
 ### 1. Agent loop is an async generator
@@ -84,7 +87,33 @@ Two orthogonal package mechanisms coexist:
   ~200ms–1.5s first use, free afterwards. The system prompt already tells the
   model to just `import` these freely.
 
-### 3. Python state persists across tool calls
+### 3. `helpers.ts` is the second source of truth, for the Python helper library
+
+`HELPER_REGISTRY` lists every pre-loaded helper (`name`, `group`, `signature`,
+`doc`); the Python implementations live as `String.raw` strings in
+`helpers-python.ts` (`CORE_PY` / `FS_PY` / `NET_PY`, stdlib only, exec'd into one
+module named `HELPER_MODULE` (`agent_helpers`, deliberately not `helpers`, so it
+cannot shadow a mounted project's own `helpers.py`) whose `__all__` is copied
+into the user's globals).
+`resolveHelpers({allowNet, hasMount})` generates both the Python prelude
+(`HelperResolution.preludeCode`, run by the worker right after the package
+prelude and before `HOST_EXEC_BLOCKER`) and the system prompt's helper section,
+including the worked example (`exampleKind`). **Helpers unavailable in the
+current mode (the `net` group without `--allow-net`) must not be defined or
+mentioned anywhere — prompt text, examples, rules, tool description.** To add a
+helper: implement it in `helpers-python.ts`, list it in that source's
+`__all__.extend([...])`, add a registry entry — don't edit the prompt by hand.
+`fetch` talks to `pyfetch` through the module variable `_pyfetch` so tests can
+replace it (`tests/helpers.test.ts`; one test also runs the real path with
+`realNet`). `save()` itself refuses to overwrite a file under `/host` that
+existed before the session unless `overwrite=True` — that guard lives in the
+helper, not only in the prompt. Pyodide's `pyfetch` imports
+`AbortController, AbortSignal, Object, Request, fetch` from `js` in one
+statement, so the worker passes `NET_JSGLOBALS` (not `SAFE_JSGLOBALS`) when
+`--allow-net` is set. `agent.ts` caps tool output sent to the
+model at `MAX_TOOL_OUTPUT_CHARS` (`tool-defs.ts`) via `truncateMiddle`.
+
+### 4. Python state persists across tool calls
 
 Pyodide globals (including `scratchpad`) survive between `execute_code`
 invocations within a session. The main thread talks to the worker through
@@ -94,7 +123,7 @@ session. `/reset` in the REPL clears both chat history and runs
 imports and user-defined globals persist). The system prompt in
 `system-prompt.ts` explicitly instructs the model to exploit this.
 
-### 4. System prompt is generated per-run
+### 5. System prompt is generated per-run
 
 `buildSystemPrompt()` is called once in `main.ts` after package resolution, and
 the output reflects **this run's** loaded packages and mount state. If you
@@ -120,7 +149,7 @@ between `PACKAGE_REGISTRY` and the prompt is a real hazard.
 - **Python network is gated by `--allow-net`.** Two layers again: (1) the
   default `deno task start` grants only
   `--allow-net=api.openai.com,cdn.jsdelivr.net` (enough for the agent loop +
-  Pyodide wheel auto-loading); (2) `ssl` + `pyodide-http` are only added to
+  Pyodide wheel auto-loading); (2) `pyodide-http` is only added to
   `ALWAYS_LOADED` when `--allow-net` is passed to `main.ts`.
   `deno task start:net` wires both. Without the flag, an `import requests`
   succeeds (Pyodide auto-loads the wheel from CDN), but
@@ -134,9 +163,15 @@ between `PACKAGE_REGISTRY` and the prompt is a real hazard.
   1. **Worker permissions (primary).** By default the Pyodide worker gets a much
      narrower Deno permission profile than `main.ts`: no env, no run, no ffi, no
      sys, filesystem limited to the Pyodide cache plus optional `--mount-dir`.
-  2. **Restricted JS globals.** `loadPyodide({ jsglobals })` is passed a curated
-     object instead of `globalThis`, so Python can't do `from js import Deno` to
-     escape to host APIs.
+  2. **Restricted JS globals (UX guard, not a boundary).** `loadPyodide({ jsglobals })`
+     is passed a curated object instead of `globalThis`, so `from js import Deno`
+     fails with a clear error. It does **not** stop a determined caller:
+     `console.constructor.constructor("return Deno")()` reaches the worker's real
+     `Deno` (and `Object`/`Function`) in every mode — pinned by a test in
+     `security.test.ts`. What that `Deno` can actually do is bounded only by
+     layer 1. With `--allow-net` the curated object also carries the Fetch API
+     (`NET_JSGLOBALS`), which `pyfetch` needs and which adds no capability beyond
+     the worker's `net` permission.
   3. **Python-level `HOST_EXEC_BLOCKER`** in `pyodide-worker.ts` — replaces
      `os.system`/`os.popen`/`os.exec*`/`os.spawn*`/`subprocess.*`/`ctypes.CDLL(None)`
      with stubs raising `PermissionError`. Toggled off by `--allow-host-exec`
@@ -158,8 +193,9 @@ between `PACKAGE_REGISTRY` and the prompt is a real hazard.
 - **This is a real sandbox, not a blocklist.** Historical context: earlier the
   project ran on Node, where Pyodide is explicitly _not_ sandboxed
   ([GSOC 2023 wiki](https://github.com/pyodide/pyodide/wiki/GSOC-2023); see also
-  n8n CVE-2025-68668, Grist Cellbreak). The worker permission model plus
-  restricted JS globals is what replaces that gap. Don't relax `--allow-*` flags
+  n8n CVE-2025-68668, Grist Cellbreak). The worker permission model
+  (layer 1) is what replaces that gap; the restricted JS globals only make
+  accidents obvious. Don't relax `--allow-*` flags
   in tasks without thinking through what Python gains.
 - `--mount-dir` is the only way to expose host files; when active, `/host/`
   inside Python is read-write on the real filesystem (via `pyodide.mountNodeFS`
@@ -172,7 +208,7 @@ between `PACKAGE_REGISTRY` and the prompt is a real hazard.
 
 `Dockerfile` is a two-stage build on `denoland/deno:alpine`. Stage 1 runs
 `deno cache src/main.ts` to populate `DENO_DIR`, then `deno eval` to pre-warm
-the default Pyodide wheels (`micropip`, `ssl`, `pyodide-http`, `pyyaml`,
+the default Pyodide wheels (`micropip`, `pyodide-http`, `pyyaml`,
 `python-dateutil`, plus the `requests` stack: `requests`, `certifi`, `idna`,
 `urllib3`, `charset-normalizer`) into that same `DENO_DIR` so the runtime image
 is offline-capable on first run even if the user opts into `--allow-net`. Stage

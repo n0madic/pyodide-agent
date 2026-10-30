@@ -16,16 +16,36 @@ const { loadPyodide } = pyodideModule as {
 };
 
 // Python gets a curated JS bridge. This intentionally omits `Deno`, `process`,
-// and the rest of the host global scope.
+// and the rest of the host global scope, so the obvious `from js import Deno`
+// fails clearly. It is NOT a security boundary: `console.constructor.constructor`
+// still reaches `Function` and thus the real `Deno` (see security.test.ts). The
+// worker's permission profile is the boundary.
 const SAFE_JSGLOBALS = Object.freeze({
   console,
+});
+
+// With --allow-net, `pyodide.http.pyfetch` (and everything built on it:
+// `requests` via pyodide-http, the `fetch` helper) needs the Fetch API from the
+// JS side: pyodide.http._pyfetch imports `AbortController, AbortSignal, Object,
+// Request, fetch` in a single all-or-nothing statement. These add no capability
+// beyond the worker's own `net` permission, which is what actually gates the
+// traffic (verified: `Object` is already reachable from Python via
+// `console.constructor`, and so is `Function`, in every mode).
+const NET_JSGLOBALS = Object.freeze({
+  ...SAFE_JSGLOBALS,
+  fetch,
+  AbortController,
+  AbortSignal,
+  Object,
+  Headers,
+  Request,
+  Response,
 });
 
 // Python-level hardening applied when host exec is NOT allowed.
 //
 // IMPORTANT: this is best-effort UX hardening, not the primary sandbox. The
-// real boundary is the worker's Deno permission profile plus the restricted
-// JS globals passed to Pyodide.
+// real boundary is the worker's Deno permission profile.
 const HOST_EXEC_BLOCKER = `
 def _pyodide_agent_apply_sandbox():
     import os as _os
@@ -110,7 +130,7 @@ async function initPyodideInternal(
 
   status("loading pyodide…");
   pyodide = await loadPyodide({
-    jsglobals: SAFE_JSGLOBALS,
+    jsglobals: payload.allowNet ? NET_JSGLOBALS : SAFE_JSGLOBALS,
     packageCacheDir: payload.packageCacheDir,
   });
 
@@ -133,6 +153,7 @@ async function initPyodideInternal(
   }
 
   await pyodide.runPythonAsync(payload.packages.preludeCode);
+  await pyodide.runPythonAsync(payload.helpersCode);
 
   if (!payload.allowHostExec) {
     await pyodide.runPythonAsync(HOST_EXEC_BLOCKER);

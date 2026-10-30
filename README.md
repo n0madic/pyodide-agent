@@ -47,7 +47,7 @@ URLs. Opt in via `start:net`.
 | ------------------------ | ---------------------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
 | `deno task start`        | **off** (scoped to `api.openai.com,cdn.jsdelivr.net` at the Deno layer)      | blocked                                     | Default — worker denies direct host API access and only mounts files you opt into. |
 | `deno task start:docker` | same as `start`, but without `--env-file` and with an absolute in-image path | blocked                                     | Used by the Docker image entrypoint.                                               |
-| `deno task start:net`    | on (broad `--allow-net` + loads `ssl` + `pyodide-http`)                      | blocked                                     | When the task genuinely needs HTTP/HTTPS from Python.                              |
+| `deno task start:net`    | on (broad `--allow-net` + loads `pyodide-http`)                      | blocked                                     | When the task genuinely needs HTTP/HTTPS from Python.                              |
 | `deno task start:unsafe` | on                                                                           | `os.system` / `ctypes` reach the real shell | Only on a machine you own.                                                         |
 
 `deno task compile` produces a standalone `./pyodide-agent` binary (~100 MB;
@@ -89,7 +89,7 @@ Always loaded (regardless of `--packages`):
 
 Loaded only with `--allow-net` (`deno task start:net`):
 
-- **`ssl`** + **`pyodide-http`** — make HTTPS work. `pyodide_http.patch_all()`
+- **`pyodide-http`** — makes HTTPS work. `pyodide_http.patch_all()`
   runs at startup so `import requests` goes through `pyfetch` transparently.
   Without `--allow-net` these are skipped and any attempt to reach an arbitrary
   host fails at the Deno permission layer with
@@ -116,13 +116,13 @@ The rest depends on `--packages` / `PYODIDE_PACKAGES`:
 
 Override per-run: `--packages pyyaml,python-dateutil,numpy,pandas`. Use
 `--packages none` to skip user packages (smallest footprint — only the always-on
-set: `micropip`, `ssl`, `pyodide-http`).
+set: `micropip`, `pyodide-http`).
 
 ## Sandbox boundaries
 
 The primary boundary is a dedicated Deno worker with a narrower permission set
-than the main CLI process, layered with a restricted Pyodide JS bridge and a
-Python-level block as defense-in-depth.
+than the main CLI process. A restricted Pyodide JS bridge and a Python-level
+block add clearer errors on top, but they are not security boundaries.
 
 - **Host process execution:** deliberately not granted. The default task
   launches the Pyodide worker without host-exec privileges. On top of that, the
@@ -133,14 +133,16 @@ Python-level block as defense-in-depth.
   `deno task start:unsafe` is for.
 - **Host filesystem:** isolated by default (Pyodide's MEMFS). Pass
   `--mount-dir <path>` to expose one host directory at `/host` read-write via
-  `pyodide.mountNodeFS`. Python does **not** get raw `Deno` access through the
-  JS bridge, so there is no backdoor around this mount.
-- **JS bridge:** restricted. Python can use only a curated JS global scope;
-  `from js import Deno` and direct environment/file access from Python are
-  blocked.
+  `pyodide.mountNodeFS`. The worker is only granted read/write on that directory
+  (plus the Pyodide cache), so nothing else on the host filesystem is reachable.
+- **JS bridge:** curated, but not a boundary. `from js import Deno` fails, yet a
+  determined Python snippet can still reach the worker's `Deno` object via
+  `console.constructor.constructor`. Everything that object can do is limited by
+  the worker's permissions: no env, no subprocesses, no FFI, no system info, no
+  filesystem outside the mount and the cache.
 - **Network (from Python):** off by default. The default task grants Deno
   `--allow-net=api.openai.com,cdn.jsdelivr.net` — enough for the agent loop and
-  Pyodide wheel auto-loading, nothing else. `ssl` and `pyodide-http` are _not_
+  Pyodide wheel auto-loading, nothing else. `pyodide-http` is _not_
   loaded in this mode; `requests.get("https://whatever")` fails with
   `ConnectionError: Requires net access to "whatever:443"`. Pass `--allow-net`
   (via `deno task start:net`) to flip on the Python HTTP stack + broad Deno

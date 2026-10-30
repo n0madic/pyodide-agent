@@ -1,5 +1,8 @@
 import type OpenAI from "openai";
 
+/** Max characters of tool output sent back to the model (middle is cut). */
+export const MAX_TOOL_OUTPUT_CHARS = 12000;
+
 export interface ToolDefsOpts {
   allowHostExec?: boolean;
   allowNet?: boolean;
@@ -12,6 +15,8 @@ function buildExecuteCodeDescription(opts: ToolDefsOpts): string {
     "Variables you define and the `scratchpad` dict persist between calls within a session.",
     "Top-level `await` is supported.",
     "Direct access to Deno/host APIs through the JS bridge is restricted.",
+    "Prefer ONE complete script per task: plan in comments, run independent stages so a failure in one does not lose the others, verify the results, and print a compact summary.",
+    `Output beyond ${MAX_TOOL_OUTPUT_CHARS} characters is truncated, so filter and aggregate in code instead of printing raw data.`,
   ];
 
   parts.push(

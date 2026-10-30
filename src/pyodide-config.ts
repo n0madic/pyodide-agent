@@ -17,11 +17,6 @@ const PACKAGE_REGISTRY: Record<string, PackageSpec> = {
     bullet: "`micropip` — call `await micropip.install('pkg')` to fetch " +
       "more Pyodide wheels or pure-Python PyPI packages at runtime",
   },
-  ssl: {
-    // stdlib `ssl` is available; no auto-import needed (imported on demand).
-    imports: [],
-    bullet: "`ssl` (stdlib) — TLS primitives + enables HTTPS for `requests`",
-  },
   "pyodide-http": {
     // Monkey-patches `requests` (and `urllib`/`http.client` in browser contexts)
     // to route through `pyfetch`, so HTTPS calls actually work from WASM.
@@ -80,12 +75,11 @@ export const DEFAULT_PACKAGE_SPEC = "pyyaml,python-dateutil";
 const ALWAYS_LOADED_BASE = ["micropip"] as const;
 
 // Loaded only when network is enabled (--allow-net):
-//   - ssl: stdlib TLS primitives
 //   - pyodide-http: monkey-patches `requests` to route through `pyfetch` so HTTPS
 //     actually works from WASM. Loading this module without net permission would
 //     just produce misleading errors — `requests.get` would reach Deno's fetch
 //     and be denied at the OS permission layer.
-const NET_PACKAGES = ["ssl", "pyodide-http"] as const;
+const NET_PACKAGES = ["pyodide-http"] as const;
 
 export interface PackageResolution {
   /** Packages to hand to `pyodide.loadPackage()`. */
@@ -103,7 +97,7 @@ export interface PackageResolution {
  *  - empty string / "none" → bare Python, no packages loaded
  *  - comma-separated list (e.g. `"pyyaml,numpy,pandas"`)
  *
- * `allowNet` adds the `ssl` + `pyodide-http` pair so HTTPS works from Python;
+ * `allowNet` adds `pyodide-http` so HTTPS works from Python;
  * when false those are skipped and Python effectively has no network.
  */
 export function resolvePackages(

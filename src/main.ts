@@ -5,6 +5,7 @@ import * as readline from "node:readline/promises";
 import process from "node:process";
 import { type AgentEvent, type AgentRunResult, runAgent } from "./agent.ts";
 import { renderEvent, renderMarkdown } from "./cli-format.ts";
+import { resolveHelpers } from "./helpers.ts";
 import { buildSystemPrompt } from "./system-prompt.ts";
 import { buildTools } from "./tool-defs.ts";
 import {
@@ -70,7 +71,7 @@ const program = new Command()
   )
   .option(
     "--allow-net",
-    "Enable outbound HTTP/HTTPS from Python — loads `ssl` + `pyodide-http` and runs " +
+    "Enable outbound HTTP/HTTPS from Python — loads `pyodide-http` and runs " +
       "`pyodide_http.patch_all()` so `import requests` just works. Also requires Deno-level " +
       "broad --allow-net (use `deno task start:net` which sets both). Without this flag " +
       "the default Deno posture grants net only to api.openai.com + cdn.jsdelivr.net, so " +
@@ -111,9 +112,11 @@ const packages = resolvePackages(
   opts.packages ?? Deno.env.get("PYODIDE_PACKAGES") ?? undefined,
   allowNet,
 );
+const helpers = resolveHelpers({ allowNet, hasMount: !!opts.mountDir });
 const systemPrompt = buildSystemPrompt({
   mountDir: opts.mountDir,
   packages,
+  helpers,
   allowHostExec,
   allowNet,
 });
@@ -150,6 +153,7 @@ async function bootPyodide(interactive: boolean): Promise<void> {
   await initPyodide({
     ...(opts.mountDir ? { mountDir: opts.mountDir } : {}),
     packages,
+    helpers,
     allowHostExec,
     allowNet,
     onStatus: showStatus

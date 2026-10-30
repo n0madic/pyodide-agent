@@ -2,7 +2,7 @@
 # Unified launcher for all deno task start* variants (local + Docker).
 # Usage: start.sh [--net|--unsafe] [app args...]
 #
-# --net    broad --allow-net, loads ssl+pyodide-http
+# --net    broad --allow-net, loads pyodide-http
 # --unsafe --allow-all + Python host-exec unblocked
 # (none)   scoped --allow-net, OPENAI_BASE_URL host auto-added
 #

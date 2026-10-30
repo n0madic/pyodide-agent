@@ -10,7 +10,10 @@ export interface ExecuteResult {
 export interface WorkerInitPayload {
   mountDir?: string;
   packages: PackageResolution;
+  /** Python source that defines the pre-loaded helper library. */
+  helpersCode: string;
   allowHostExec?: boolean;
+  allowNet?: boolean;
   packageCacheDir: string;
 }
 

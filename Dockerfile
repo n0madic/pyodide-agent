@@ -22,7 +22,7 @@ RUN deno eval \
     'import m from "npm:pyodide@^314.0.7/pyodide.js"; \
      const { loadPyodide } = m; \
      const py = await loadPyodide(); \
-     await py.loadPackage(["micropip","ssl","pyodide-http","pyyaml","python-dateutil", \
+     await py.loadPackage(["micropip","pyodide-http","pyyaml","python-dateutil", \
        "requests","certifi","idna","urllib3","charset-normalizer"], \
        { messageCallback: console.log, errorCallback: console.error }); \
      console.log("prewarm complete");'

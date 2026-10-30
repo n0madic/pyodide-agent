@@ -4,6 +4,7 @@ import {
   type PackageResolution,
   resolvePackages,
 } from "./pyodide-config.ts";
+import { type HelperResolution, resolveHelpers } from "./helpers.ts";
 import type {
   ExecuteResult,
   WorkerRequest,
@@ -29,8 +30,10 @@ interface PendingRequest<T> {
 
 export interface InitOpts {
   mountDir?: string;
-  /** Pre-resolved package spec. Defaults to `resolvePackages(undefined, false)`. */
+  /** Pre-resolved package spec. Defaults to `resolvePackages(undefined, allowNet)`. */
   packages?: PackageResolution;
+  /** Pre-resolved helper library. Defaults to `resolveHelpers` matching `allowNet` / `mountDir`. */
+  helpers?: HelperResolution;
   onStatus?: (msg: string) => void;
   /**
    * If true, skip the Python-level hardening that blocks `os.system`,
@@ -181,8 +184,15 @@ export async function initPyodide(opts: InitOpts = {}): Promise<void> {
         requestId: makeRequestId(),
         payload: {
           ...(opts.mountDir ? { mountDir: opts.mountDir } : {}),
-          packages: opts.packages ?? resolvePackages(undefined, false),
+          packages: opts.packages ?? resolvePackages(undefined, !!opts.allowNet),
+          helpersCode: (opts.helpers ??
+            resolveHelpers({
+              allowNet: !!opts.allowNet,
+              hasMount: !!opts.mountDir,
+            }))
+            .preludeCode,
           allowHostExec: opts.allowHostExec,
+          allowNet: opts.allowNet,
           packageCacheDir: PYODIDE_ASSET_ROOT,
         },
       }, statusCallback ?? undefined);

@@ -1,59 +1,10 @@
-import { dirname, fromFileUrl, join } from "@std/path";
-
-const dec = new TextDecoder();
-const repoRoot = dirname(dirname(fromFileUrl(import.meta.url)));
-const runtimeModuleUrl =
-  new URL("../src/pyodide-runtime.ts", import.meta.url).href;
-const denoJsonPath = join(repoRoot, "deno.json");
-const mainTsPath = join(repoRoot, "src", "main.ts");
-
-interface RunResult {
-  code: number;
-  stdout: string;
-  stderr: string;
-}
-
-async function runRuntimeSnippet(
-  source: string,
-  {
-    env,
-  }: {
-    env?: Record<string, string>;
-  } = {},
-): Promise<RunResult> {
-  const tempDir = await Deno.makeTempDir({ prefix: "pyodide-agent-test-" });
-  const scriptPath = join(tempDir, "snippet.ts");
-  await Deno.writeTextFile(scriptPath, source);
-
-  try {
-    const output = await new Deno.Command("deno", {
-      args: [
-        "run",
-        "--config",
-        denoJsonPath,
-        "--unstable-worker-options",
-        "--allow-read",
-        "--allow-write",
-        "--allow-net=cdn.jsdelivr.net",
-        "--allow-import=cdn.jsdelivr.net,jsr.io",
-        ...(env ? [`--allow-env=${Object.keys(env).join(",")}`] : []),
-        scriptPath,
-      ],
-      cwd: repoRoot,
-      env,
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-
-    return {
-      code: output.code,
-      stdout: dec.decode(output.stdout),
-      stderr: dec.decode(output.stderr),
-    };
-  } finally {
-    await Deno.remove(tempDir, { recursive: true });
-  }
-}
+import { join } from "@std/path";
+import {
+  denoJsonPath,
+  mainTsPath,
+  runRuntimeSnippet,
+  runtimeModuleUrl,
+} from "./_pyodide.ts";
 
 Deno.test({
   name: "runtime blocks importing Deno from Python js bridge",
@@ -138,6 +89,71 @@ Deno.test({
       throw new Error(
         `expected Deno import failure, got stderr=${parsed.stderr}`,
       );
+    }
+  },
+});
+
+Deno.test({
+  name: "known bypass: curated js globals still reach Deno, but worker permissions hold",
+  permissions: { read: true, write: true, run: true, env: true },
+  async fn() {
+    // Documents (does not endorse) that the restricted jsglobals are only a UX
+    // guard. If the first assertion ever starts failing the bypass was closed:
+    // update the "Restricted JS globals" notes in CLAUDE.md and README.md.
+    // Everything below it must keep failing: that is the real boundary.
+    const result = await runRuntimeSnippet(
+      `
+      import { closePyodide, initPyodide, executeCode, resolvePackages } from ${
+        JSON.stringify(runtimeModuleUrl)
+      };
+
+      await initPyodide({ packages: resolvePackages(undefined, false) });
+      const probes: Record<string, string> = {
+        reachesDeno:
+          "from js import console\\nprint(console.constructor.constructor('return typeof Deno')())",
+        // Each of these must be denied by the worker's permission profile.
+        env: "from js import console\\nF = console.constructor.constructor\\nprint(F('return Deno.env.get(\\"PYODIDE_AGENT_TEST_SECRET\\")')())",
+        run: "from js import console\\nF = console.constructor.constructor\\nF('return new Deno.Command(\\"echo\\", {args: [\\"hi\\"]}).outputSync()')()",
+        readOutsideMount: "from js import console\\nF = console.constructor.constructor\\nprint(F('return Deno.readTextFileSync(\\"/etc/hosts\\")')())",
+        writeOutsideMount: "from js import console\\nF = console.constructor.constructor\\nF('return Deno.writeTextFileSync(\\"/tmp/pyodide-agent-escape.txt\\", \\"x\\")')()",
+        sys: "from js import console\\nF = console.constructor.constructor\\nprint(F('return Deno.hostname()')())",
+      };
+      const out: Record<string, unknown> = {};
+      for (const [name, code] of Object.entries(probes)) {
+        out[name] = await executeCode(code);
+      }
+      console.log(JSON.stringify(out));
+      closePyodide();
+    `,
+      { env: { PYODIDE_AGENT_TEST_SECRET: "super-secret-value" } },
+    );
+
+    if (result.code !== 0) {
+      throw new Error(`snippet failed unexpectedly:\n${result.stderr}`);
+    }
+    const parsed = JSON.parse(result.stdout.trim()) as Record<
+      string,
+      { ok: boolean; stdout: string; stderr: string }
+    >;
+
+    if (!parsed.reachesDeno.ok || parsed.reachesDeno.stdout.trim() !== "object") {
+      throw new Error(
+        "the Function bypass no longer reaches Deno - the jsglobals gap was " +
+          `closed; update CLAUDE.md/README.md. Got ${JSON.stringify(parsed.reachesDeno)}`,
+      );
+    }
+    for (
+      const name of ["env", "run", "readOutsideMount", "writeOutsideMount", "sys"]
+    ) {
+      const r = parsed[name];
+      if (r.ok || !/NotCapable|Requires .* access/.test(r.stderr)) {
+        throw new Error(
+          `worker permissions did not deny '${name}': ${JSON.stringify(r)}`,
+        );
+      }
+      if (r.stdout.includes("super-secret-value")) {
+        throw new Error(`secret leaked through '${name}'`);
+      }
     }
   },
 });
